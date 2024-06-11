@@ -10,39 +10,60 @@ package main
 
 import (
 	"fmt"
+	"sync"
 	"time"
 )
 
-func producer(stream Stream) (tweets []*Tweet) {
+func producer(stream Stream, tweets chan *Tweet, wg *sync.WaitGroup) {
 	for {
 		tweet, err := stream.Next()
 		if err == ErrEOF {
-			return tweets
+
+			// stream has ended
+			close(tweets)
+			wg.Done()
+			return
 		}
 
-		tweets = append(tweets, tweet)
+		tweets <- tweet
 	}
 }
 
-func consumer(tweets []*Tweet) {
-	for _, t := range tweets {
+func consumer(tweets <-chan *Tweet, wg *sync.WaitGroup) {
+	for t := range tweets {
 		if t.IsTalkingAboutGo() {
 			fmt.Println(t.Username, "\ttweets about golang")
 		} else {
 			fmt.Println(t.Username, "\tdoes not tweet about golang")
 		}
 	}
+	wg.Done()
 }
 
 func main() {
 	start := time.Now()
 	stream := GetMockStream()
 
+	wg := &sync.WaitGroup{}
+
 	// Producer
-	tweets := producer(stream)
+	tweets := make(chan *Tweet)
+	wg.Add(1)
+	// run producer on goroutine
+	// return channel to communicate
+	// produced value
+	// so that we can unblock
+	// consumer
+	go producer(stream, tweets, wg)
 
 	// Consumer
-	consumer(tweets)
+	wg.Add(1)
+	// run consumer goroutine concurrently
+	// to optimise the consumption
+	go consumer(tweets, wg)
+
+	// wait for both goroutines to finish
+	wg.Wait()
 
 	fmt.Printf("Process took %s\n", time.Since(start))
 }
