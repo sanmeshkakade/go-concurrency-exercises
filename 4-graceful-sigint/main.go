@@ -13,9 +13,36 @@
 
 package main
 
+import (
+	"fmt"
+	"os"
+	"os/signal"
+)
+
 func main() {
+
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt)
+
 	// Create a process
 	proc := MockProcess{}
+
+	// fire goroutine to watch for sigint
+	go func() {
+
+		// get the first sigint
+		sig := <-sigChan
+		fmt.Printf("\nreceived %q", sig)
+
+		// start the clean up process for
+		// graceful shutdown
+		go proc.Stop()
+
+		// wait for second interrupt
+		// to kill the program
+		<-sigChan
+		os.Exit(0)
+	}()
 
 	// Run the process (blocking)
 	proc.Run()
