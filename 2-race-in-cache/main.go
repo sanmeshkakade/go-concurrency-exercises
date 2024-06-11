@@ -10,6 +10,7 @@ package main
 
 import (
 	"container/list"
+	"sync"
 	"testing"
 )
 
@@ -31,6 +32,7 @@ type page struct {
 type KeyStoreCache struct {
 	cache map[string]*list.Element
 	pages list.List
+	lock  sync.RWMutex
 	load  func(string) string
 }
 
@@ -38,12 +40,17 @@ type KeyStoreCache struct {
 func New(load KeyStoreCacheLoader) *KeyStoreCache {
 	return &KeyStoreCache{
 		load:  load.Load,
+		lock:  sync.RWMutex{},
 		cache: make(map[string]*list.Element),
 	}
 }
 
 // Get gets the key from cache, loads it from the source if needed
 func (k *KeyStoreCache) Get(key string) string {
+
+	// lock
+	k.lock.Lock()
+	defer k.lock.Unlock()
 	if e, ok := k.cache[key]; ok {
 		k.pages.MoveToFront(e)
 		return e.Value.(page).Value
