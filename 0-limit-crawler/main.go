@@ -12,7 +12,11 @@ package main
 import (
 	"fmt"
 	"sync"
+	"time"
 )
+
+// create a channel of type time.Time
+var limitter <-chan time.Time
 
 // Crawl uses `fetcher` from the `mockfetcher.go` file to imitate a
 // real crawler. It crawls until the maximum depth has reached.
@@ -22,6 +26,12 @@ func Crawl(url string, depth int, wg *sync.WaitGroup) {
 	if depth <= 0 {
 		return
 	}
+
+	// wait till you receive a tick
+	// with every tick received 
+	// we perform the fetch and add 
+	// new jobs to fetch
+	<-limitter
 
 	body, urls, err := fetcher.Fetch(url)
 	if err != nil {
@@ -42,6 +52,11 @@ func Crawl(url string, depth int, wg *sync.WaitGroup) {
 
 func main() {
 	var wg sync.WaitGroup
+
+	// create a read only channel which 
+	// receives an input of type time.Time
+	// given to time.Tick()
+	limitter = time.Tick(time.Second)
 
 	wg.Add(1)
 	Crawl("http://golang.org/", 4, &wg)
